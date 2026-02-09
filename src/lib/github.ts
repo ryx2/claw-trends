@@ -44,6 +44,7 @@ export async function fetchOpenPRs(since?: string): Promise<PR[]> {
         url: pr.html_url,
         created_at: pr.created_at,
         user: pr.user?.login ?? "unknown",
+        comments: (pr.comments ?? 0) + (pr.review_comments ?? 0),
       });
     }
 

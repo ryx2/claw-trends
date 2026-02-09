@@ -5,6 +5,7 @@ export interface PR {
   url: string;
   created_at: string;
   user: string;
+  comments: number;
 }
 
 export interface PRMetadata {

@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
         };
 
         await upsertPR(prId, vector, metadata);
-        await insertPR(prId, pr.number, pr.title, pr.url, clusterId, pr.created_at);
+        await insertPR(prId, pr.number, pr.title, pr.url, clusterId, pr.created_at, pr.comments);
         processed++;
       } catch (err) {
         console.error(`Failed to process PR #${pr.number}:`, err);

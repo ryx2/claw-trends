@@ -8,6 +8,7 @@ interface PR {
   url: string;
   status: string;
   created_at: string;
+  comments: number;
 }
 
 interface Cluster {
@@ -250,6 +251,11 @@ export default function Home() {
                         <span style={{ fontSize: 11, color: "#666", marginLeft: 6 }}>
                           {new Date(pr.created_at + "Z").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                         </span>
+                        {pr.comments > 0 && (
+                          <span style={{ fontSize: 11, color: "#666", marginLeft: 4 }}>
+                            💬{pr.comments}
+                          </span>
+                        )}
                         {pr.status === "closed" && (
                           <span style={{ fontSize: 11, color: "#888", background: "#262626", padding: "1px 6px", borderRadius: 4, marginLeft: 4 }}>closed</span>
                         )}

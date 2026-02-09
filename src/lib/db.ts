@@ -9,9 +9,12 @@ export async function ensureTable() {
       url TEXT NOT NULL,
       cluster_id VARCHAR(255) NOT NULL,
       created_at TIMESTAMP NOT NULL,
-      status VARCHAR(20) NOT NULL DEFAULT 'open'
+      status VARCHAR(20) NOT NULL DEFAULT 'open',
+      comments INTEGER NOT NULL DEFAULT 0
     )
   `;
+  // Migration: add comments column if missing
+  await sql`ALTER TABLE prs ADD COLUMN IF NOT EXISTS comments INTEGER NOT NULL DEFAULT 0`;
   await sql`CREATE INDEX IF NOT EXISTS idx_prs_cluster_id ON prs (cluster_id)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_prs_status ON prs (status)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_prs_created_at ON prs (created_at)`;
@@ -23,12 +26,13 @@ export async function insertPR(
   title: string,
   url: string,
   clusterId: string,
-  createdAt: string
+  createdAt: string,
+  comments: number
 ) {
   await sql`
-    INSERT INTO prs (pinecone_id, pr_number, title, url, cluster_id, created_at, status)
-    VALUES (${pineconeId}, ${prNumber}, ${title}, ${url}, ${clusterId}, ${createdAt}, 'open')
-    ON CONFLICT (pinecone_id) DO NOTHING
+    INSERT INTO prs (pinecone_id, pr_number, title, url, cluster_id, created_at, status, comments)
+    VALUES (${pineconeId}, ${prNumber}, ${title}, ${url}, ${clusterId}, ${createdAt}, 'open', ${comments})
+    ON CONFLICT (pinecone_id) DO UPDATE SET comments = ${comments}
   `;
 }
 
@@ -49,7 +53,6 @@ export async function markClosedPRs(openPRNumbers: number[]) {
     return;
   }
 
-  const openSet = openPRNumbers.join(",");
   await sql.query(
     `UPDATE prs SET status = 'closed' WHERE status = 'open' AND pr_number != ALL($1::int[])`,
     [openPRNumbers]
@@ -68,7 +71,8 @@ export async function getClusters(since?: string) {
               'title', title,
               'url', url,
               'status', status,
-              'created_at', created_at
+              'created_at', created_at,
+              'comments', comments
             )
             ORDER BY created_at DESC
           ) AS prs
@@ -87,7 +91,8 @@ export async function getClusters(since?: string) {
               'title', title,
               'url', url,
               'status', status,
-              'created_at', created_at
+              'created_at', created_at,
+              'comments', comments
             )
             ORDER BY created_at DESC
           ) AS prs
