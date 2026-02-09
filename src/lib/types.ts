@@ -16,6 +16,24 @@ export interface PRMetadata {
   created_at: string;
 }
 
+export interface Issue {
+  number: number;
+  title: string;
+  body: string;
+  url: string;
+  created_at: string;
+  user: string;
+  comments: number;
+}
+
+export interface IssueMetadata {
+  issue_number: number;
+  title: string;
+  url: string;
+  cluster_id: string;
+  created_at: string;
+}
+
 export interface Cluster {
   id: string;
   label: string;

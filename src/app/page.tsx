@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 
-interface PR {
+interface Item {
   number: number;
   title: string;
   url: string;
@@ -16,7 +16,7 @@ interface Cluster {
   id: string;
   label: string;
   count: number;
-  prs: PR[];
+  prs: Item[];
 }
 
 const RANGES = [
@@ -28,6 +28,7 @@ const RANGES = [
 ] as const;
 
 type RangeKey = (typeof RANGES)[number]["key"];
+type TabType = "pr" | "issue";
 
 const VALID_RANGES = new Set<string>(RANGES.map((r) => r.key));
 
@@ -38,6 +39,10 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [activeTab, setActiveTab] = useState<TabType>("pr");
+  const [copied, setCopied] = useState<string | null>(null);
+  const clusterRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const hasScrolledToHash = useRef(false);
 
   const range = useMemo<RangeKey>(() => {
     const param = searchParams.get("range");
@@ -49,10 +54,13 @@ export default function Home() {
     router.push(params, { scroll: false });
   }
 
-  const fetchClusters = useCallback(async (r: RangeKey) => {
+  const fetchClusters = useCallback(async (r: RangeKey, tab: TabType) => {
     try {
-      const params = r === "all" ? "" : `?range=${r}`;
-      const res = await fetch(`/api/clusters${params}`);
+      const params = new URLSearchParams();
+      if (r !== "all") params.set("range", r);
+      params.set("type", tab);
+      const qs = params.toString();
+      const res = await fetch(`/api/clusters?${qs}`);
       if (!res.ok) throw new Error("fetch failed");
       const data = await res.json();
       setClusters(data.clusters);
@@ -66,10 +74,28 @@ export default function Home() {
 
   useEffect(() => {
     setLoading(true);
-    fetchClusters(range);
-    const interval = setInterval(() => fetchClusters(range), 30_000);
+    fetchClusters(range, activeTab);
+    const interval = setInterval(() => fetchClusters(range, activeTab), 30_000);
     return () => clearInterval(interval);
-  }, [range, fetchClusters]);
+  }, [range, activeTab, fetchClusters]);
+
+  // Auto-expand and scroll to cluster from URL hash
+  useEffect(() => {
+    if (loading || hasScrolledToHash.current || clusters.length === 0) return;
+    const hash = window.location.hash.slice(1); // remove #
+    if (!hash) return;
+    const decoded = decodeURIComponent(hash);
+    const match = clusters.find((c) => c.id === decoded);
+    if (match) {
+      setExpanded((prev) => new Set(prev).add(match.id));
+      hasScrolledToHash.current = true;
+      // Small delay so the DOM has the element rendered
+      requestAnimationFrame(() => {
+        const el = clusterRefs.current.get(match.id);
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+    }
+  }, [loading, clusters]);
 
   function toggleExpand(id: string) {
     setExpanded((prev) => {
@@ -80,25 +106,75 @@ export default function Home() {
     });
   }
 
+  function handleTabChange(tab: TabType) {
+    setActiveTab(tab);
+    setExpanded(new Set());
+  }
+
+  function shareCluster(e: React.MouseEvent, clusterId: string) {
+    e.stopPropagation();
+    const url = `${window.location.origin}${window.location.pathname}${window.location.search}#${encodeURIComponent(clusterId)}`;
+    navigator.clipboard.writeText(url);
+    setCopied(clusterId);
+    setTimeout(() => setCopied(null), 1500);
+  }
+
+  const itemLabel = activeTab === "pr" ? "PRs" : "issues";
+
   return (
     <div style={{ maxWidth: 768, margin: "0 auto", padding: "48px 16px" }}>
       {/* Header */}
-      <header style={{ marginBottom: 32 }}>
-        <h1 style={{ fontSize: 30, fontWeight: 700, marginBottom: 4 }}>
-          {"\uD83E\uDD9E"} Claw Trends
-        </h1>
-        <p style={{ color: "var(--text-dim)", marginBottom: 8 }}>
-          Most common PR patterns in OpenClaw
-        </p>
-        <a
-          href="https://github.com/openclaw/openclaw"
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{ color: "var(--text-dim)", fontSize: 13, textDecoration: "underline" }}
-        >
-          github.com/openclaw/openclaw
-        </a>
+      <header style={{ marginBottom: 32, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div>
+          <h1 style={{ fontSize: 30, fontWeight: 700, marginBottom: 4 }}>
+            {"\uD83E\uDD9E"} Claw Trends
+          </h1>
+          <p style={{ color: "var(--text-dim)", marginBottom: 8 }}>
+            Most common {activeTab === "pr" ? "PR" : "issue"} patterns in OpenClaw
+          </p>
+          <a
+            href="https://github.com/openclaw/openclaw"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: "var(--text-dim)", fontSize: 13, textDecoration: "underline" }}
+          >
+            github.com/openclaw/openclaw
+          </a>
+        </div>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", fontSize: 12, color: "var(--text-dim)", flexShrink: 0 }}>
+          <span>Raymond Xu</span>
+          <a href="https://github.com/ryx2" target="_blank" rel="noopener noreferrer" style={{ color: "var(--text-dim)", textDecoration: "none" }}>
+            GitHub
+          </a>
+          <a href="https://twitter.com/needhelptho" target="_blank" rel="noopener noreferrer" style={{ color: "var(--text-dim)", textDecoration: "none" }}>
+            @needhelptho
+          </a>
+        </div>
       </header>
+
+      {/* PR / Issues tabs */}
+      <div style={{ display: "flex", gap: 0, marginBottom: 16 }}>
+        {(["pr", "issue"] as const).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => handleTabChange(tab)}
+            style={{
+              padding: "8px 20px",
+              border: "1px solid var(--border)",
+              borderBottom: activeTab === tab ? "2px solid var(--claw-red)" : "1px solid var(--border)",
+              background: activeTab === tab ? "var(--surface)" : "transparent",
+              color: activeTab === tab ? "var(--text)" : "var(--text-dim)",
+              cursor: "pointer",
+              fontSize: 14,
+              fontWeight: activeTab === tab ? 600 : 400,
+              borderRadius: tab === "pr" ? "6px 0 0 0" : "0 6px 0 0",
+              marginRight: tab === "pr" ? -1 : 0,
+            }}
+          >
+            {tab === "pr" ? "Pull Requests" : "Issues"}
+          </button>
+        ))}
+      </div>
 
       {/* Range tabs */}
       <div style={{ display: "flex", gap: 4, marginBottom: 24, flexWrap: "wrap" }}>
@@ -152,7 +228,7 @@ export default function Home() {
       {/* Empty */}
       {!loading && !error && clusters.length === 0 && (
         <p style={{ color: "var(--text-dim)", textAlign: "center", padding: 40 }}>
-          No PRs found for this time range.
+          No {itemLabel} found for this time range.
         </p>
       )}
 
@@ -169,6 +245,7 @@ export default function Home() {
             return (
               <div
                 key={cluster.id}
+                ref={(el) => { if (el) clusterRefs.current.set(cluster.id, el); }}
                 style={{
                   background: "var(--surface)",
                   border: "1px solid var(--border)",
@@ -218,6 +295,20 @@ export default function Home() {
                   </span>
                   <span style={{ flex: 1 }}>{cluster.label}</span>
                   <span
+                    onClick={(e) => shareCluster(e, cluster.id)}
+                    title="Copy link to this cluster"
+                    style={{
+                      color: copied === cluster.id ? "var(--claw-red)" : "var(--text-dim)",
+                      fontSize: 12,
+                      padding: "4px 6px",
+                      borderRadius: 4,
+                      transition: "color 0.15s",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {copied === cluster.id ? "Copied!" : "Link"}
+                  </span>
+                  <span
                     style={{
                       color: "var(--text-dim)",
                       fontSize: 13,
@@ -246,10 +337,10 @@ export default function Home() {
                       gap: 8,
                     }}
                   >
-                    {cluster.prs.map((pr) => (
-                      <div key={pr.number} style={{ fontSize: 14, lineHeight: 1.6 }}>
+                    {cluster.prs.map((item) => (
+                      <div key={item.number} style={{ fontSize: 14, lineHeight: 1.6 }}>
                         <a
-                          href={pr.url}
+                          href={item.url}
                           target="_blank"
                           rel="noopener noreferrer"
                           style={{
@@ -259,18 +350,18 @@ export default function Home() {
                             marginRight: 6,
                           }}
                         >
-                          #{pr.number}
+                          #{item.number}
                         </a>
-                        <span style={{ opacity: pr.status === "closed" ? 0.5 : 1, textDecoration: pr.status === "closed" ? "line-through" : "none", color: "var(--text-dim)" }}>{pr.title}</span>
+                        <span style={{ opacity: item.status === "closed" ? 0.5 : 1, textDecoration: item.status === "closed" ? "line-through" : "none", color: "var(--text-dim)" }}>{item.title}</span>
                         <span style={{ fontSize: 11, color: "#666", marginLeft: 6 }}>
-                          {new Date(pr.created_at + "Z").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                          {new Date(item.created_at + "Z").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                         </span>
-                        {pr.comments > 0 && (
+                        {item.comments > 0 && (
                           <span style={{ fontSize: 11, color: "#666", marginLeft: 4 }}>
-                            💬{pr.comments}
+                            💬{item.comments}
                           </span>
                         )}
-                        {pr.status === "closed" && (
+                        {item.status === "closed" && (
                           <span style={{ fontSize: 11, color: "#888", background: "#262626", padding: "1px 6px", borderRadius: 4, marginLeft: 4 }}>closed</span>
                         )}
                       </div>

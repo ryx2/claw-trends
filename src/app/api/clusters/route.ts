@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getClusters } from "@/lib/db";
+import { getClusters, getIssueClusters } from "@/lib/db";
 
 const RANGES: Record<string, number> = {
   day: 1,
@@ -11,6 +11,7 @@ const RANGES: Record<string, number> = {
 export async function GET(request: NextRequest) {
   try {
     const range = request.nextUrl.searchParams.get("range");
+    const type = request.nextUrl.searchParams.get("type") || "pr";
 
     let since: string | undefined;
     if (range && range in RANGES) {
@@ -19,7 +20,8 @@ export async function GET(request: NextRequest) {
       since = d.toISOString();
     }
 
-    const clusters = await getClusters(since);
+    const clusters =
+      type === "issue" ? await getIssueClusters(since) : await getClusters(since);
 
     return NextResponse.json(
       { clusters },

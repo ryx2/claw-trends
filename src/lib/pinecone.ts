@@ -1,5 +1,5 @@
 import { Pinecone } from "@pinecone-database/pinecone";
-import { PRMetadata } from "./types";
+import { PRMetadata, IssueMetadata } from "./types";
 
 let client: Pinecone | null = null;
 
@@ -22,6 +22,17 @@ export async function upsertPR(
   id: string,
   vector: number[],
   metadata: PRMetadata
+) {
+  const index = getIndex();
+  await index.upsert({
+    records: [{ id, values: vector, metadata: metadata as unknown as Record<string, string | number> }],
+  });
+}
+
+export async function upsertIssue(
+  id: string,
+  vector: number[],
+  metadata: IssueMetadata
 ) {
   const index = getIndex();
   await index.upsert({

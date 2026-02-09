@@ -20,6 +20,45 @@ export async function ensureTable() {
   await sql`CREATE INDEX IF NOT EXISTS idx_prs_created_at ON prs (created_at)`;
 }
 
+export async function ensureIssuesTable() {
+  await sql`
+    CREATE TABLE IF NOT EXISTS issues (
+      pinecone_id VARCHAR(255) PRIMARY KEY,
+      issue_number INTEGER UNIQUE NOT NULL,
+      title TEXT NOT NULL,
+      url TEXT NOT NULL,
+      cluster_id VARCHAR(255) NOT NULL,
+      created_at TIMESTAMP NOT NULL,
+      status VARCHAR(20) NOT NULL DEFAULT 'open',
+      comments INTEGER NOT NULL DEFAULT 0
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS idx_issues_cluster_id ON issues (cluster_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_issues_status ON issues (status)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_issues_created_at ON issues (created_at)`;
+}
+
+export async function ensureSyncMetaTable() {
+  await sql`
+    CREATE TABLE IF NOT EXISTS sync_meta (
+      key VARCHAR(255) PRIMARY KEY,
+      value TEXT NOT NULL
+    )
+  `;
+}
+
+export async function getSyncMeta(key: string): Promise<string | null> {
+  const result = await sql`SELECT value FROM sync_meta WHERE key = ${key}`;
+  return result.rows[0]?.value ?? null;
+}
+
+export async function setSyncMeta(key: string, value: string) {
+  await sql`
+    INSERT INTO sync_meta (key, value) VALUES (${key}, ${value})
+    ON CONFLICT (key) DO UPDATE SET value = ${value}
+  `;
+}
+
 export async function insertPR(
   pineconeId: string,
   prNumber: number,
@@ -36,9 +75,30 @@ export async function insertPR(
   `;
 }
 
+export async function insertIssue(
+  pineconeId: string,
+  issueNumber: number,
+  title: string,
+  url: string,
+  clusterId: string,
+  createdAt: string,
+  comments: number
+) {
+  await sql`
+    INSERT INTO issues (pinecone_id, issue_number, title, url, cluster_id, created_at, status, comments)
+    VALUES (${pineconeId}, ${issueNumber}, ${title}, ${url}, ${clusterId}, ${createdAt}, 'open', ${comments})
+    ON CONFLICT (pinecone_id) DO UPDATE SET comments = ${comments}
+  `;
+}
+
 export async function getExistingPRNumbers(): Promise<Set<number>> {
   const result = await sql`SELECT pr_number FROM prs`;
   return new Set(result.rows.map((r) => r.pr_number));
+}
+
+export async function getExistingIssueNumbers(): Promise<Set<number>> {
+  const result = await sql`SELECT issue_number FROM issues`;
+  return new Set(result.rows.map((r) => r.issue_number));
 }
 
 export async function getLatestPRTimestamp(): Promise<string | null> {
@@ -56,6 +116,18 @@ export async function markClosedPRs(openPRNumbers: number[]) {
   await sql.query(
     `UPDATE prs SET status = 'closed' WHERE status = 'open' AND pr_number != ALL($1::int[])`,
     [openPRNumbers]
+  );
+}
+
+export async function markClosedIssues(openIssueNumbers: number[]) {
+  if (openIssueNumbers.length === 0) {
+    await sql`UPDATE issues SET status = 'closed' WHERE status = 'open'`;
+    return;
+  }
+
+  await sql.query(
+    `UPDATE issues SET status = 'closed' WHERE status = 'open' AND issue_number != ALL($1::int[])`,
+    [openIssueNumbers]
   );
 }
 
@@ -108,5 +180,57 @@ export async function getClusters(since?: string) {
     label: row.prs[0].title,
     count: row.count,
     prs: row.prs,
+  }));
+}
+
+export async function getIssueClusters(since?: string) {
+  const query = since
+    ? sql`
+        SELECT
+          cluster_id,
+          COUNT(*)::int AS count,
+          json_agg(
+            json_build_object(
+              'number', issue_number,
+              'title', title,
+              'url', url,
+              'status', status,
+              'created_at', created_at,
+              'comments', comments
+            )
+            ORDER BY created_at DESC
+          ) AS items
+        FROM issues
+        WHERE created_at >= ${since}::timestamp
+        GROUP BY cluster_id
+        ORDER BY count DESC
+      `
+    : sql`
+        SELECT
+          cluster_id,
+          COUNT(*)::int AS count,
+          json_agg(
+            json_build_object(
+              'number', issue_number,
+              'title', title,
+              'url', url,
+              'status', status,
+              'created_at', created_at,
+              'comments', comments
+            )
+            ORDER BY created_at DESC
+          ) AS items
+        FROM issues
+        GROUP BY cluster_id
+        ORDER BY count DESC
+      `;
+
+  const result = await query;
+
+  return result.rows.map((row) => ({
+    id: row.cluster_id,
+    label: row.items[0].title,
+    count: row.count,
+    prs: row.items,
   }));
 }

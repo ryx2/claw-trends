@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
+import Providers from "./providers";
 
 export const metadata: Metadata = {
   title: "Claw Trends — OpenClaw PR Pattern Tracker",
@@ -38,7 +41,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}>
-        {children}
+        <Providers>
+          <Suspense>{children}</Suspense>
+        </Providers>
+        <Analytics />
       </body>
     </html>
   );
