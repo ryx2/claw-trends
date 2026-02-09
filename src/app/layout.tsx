@@ -2,8 +2,24 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Claw Trends",
-  description: "Most common PR patterns in OpenClaw",
+  title: "Claw Trends — OpenClaw PR Pattern Tracker",
+  description:
+    "Track the most common pull request patterns in the OpenClaw repo. PRs are clustered by semantic similarity using Voyage AI embeddings. Filter by today, this week, this month, or all time.",
+  metadataBase: new URL("https://openclawoverview.com"),
+  openGraph: {
+    title: "Claw Trends — OpenClaw PR Pattern Tracker",
+    description:
+      "See which issues keep popping up in OpenClaw. PRs are auto-clustered by similarity and ranked by frequency.",
+    url: "https://openclawoverview.com",
+    siteName: "Claw Trends",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Claw Trends — OpenClaw PR Pattern Tracker",
+    description:
+      "See which issues keep popping up in OpenClaw. PRs are auto-clustered by similarity and ranked by frequency.",
+  },
   robots: {
     index: true,
     follow: true,
