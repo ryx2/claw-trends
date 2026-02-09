@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { fetchOpenPRs } from "@/lib/github";
+import { fetchOpenPRs, fetchOpenPRNumbers } from "@/lib/github";
 import { embed } from "@/lib/voyage";
-import { upsertPR, querySimilar, getIndex } from "@/lib/pinecone";
+import { upsertPR, querySimilar } from "@/lib/pinecone";
 import { assignCluster } from "@/lib/cluster";
+import { ensureTable, insertPR, getExistingPRNumbers, getLatestPRTimestamp, markClosedPRs } from "@/lib/db";
 import { PRMetadata } from "@/lib/types";
 
-export async function POST(request: NextRequest) {
+export async function GET(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
   const expectedToken = process.env.CRON_SECRET;
 
@@ -14,27 +15,16 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const prs = await fetchOpenPRs();
+    await ensureTable();
 
-    // Get existing PR IDs from Pinecone
-    const existingIds = new Set<string>();
-    const index = getIndex();
-    let paginationToken: string | undefined;
-
-    do {
-      const listResult = await index.listPaginated({ paginationToken });
-      for (const v of listResult.vectors || []) {
-        if (v.id) existingIds.add(v.id);
-      }
-      paginationToken = listResult.pagination?.next;
-    } while (paginationToken);
+    const latestTimestamp = await getLatestPRTimestamp();
+    const prs = await fetchOpenPRs(latestTimestamp ?? undefined);
+    const existingNumbers = await getExistingPRNumbers();
 
     let processed = 0;
 
     for (const pr of prs) {
-      const prId = `pr-${pr.number}`;
-
-      if (existingIds.has(prId)) {
+      if (existingNumbers.has(pr.number)) {
         continue;
       }
 
@@ -45,6 +35,7 @@ export async function POST(request: NextRequest) {
         const similar = await querySimilar(vector, 1);
         const clusterId = assignCluster(similar);
 
+        const prId = `pr-${pr.number}`;
         const metadata: PRMetadata = {
           pr_number: pr.number,
           title: pr.title,
@@ -54,11 +45,16 @@ export async function POST(request: NextRequest) {
         };
 
         await upsertPR(prId, vector, metadata);
+        await insertPR(prId, pr.number, pr.title, pr.url, clusterId, pr.created_at);
         processed++;
       } catch (err) {
         console.error(`Failed to process PR #${pr.number}:`, err);
       }
     }
+
+    // Fetch full list of currently open PR numbers to detect closures
+    const allOpenNumbers = await fetchOpenPRNumbers();
+    await markClosedPRs(allOpenNumbers);
 
     return NextResponse.json({
       processed,

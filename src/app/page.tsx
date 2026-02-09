@@ -6,6 +6,7 @@ interface PR {
   number: number;
   title: string;
   url: string;
+  status: string;
 }
 
 interface Cluster {
@@ -209,7 +210,10 @@ export default function Home() {
                         >
                           #{pr.number}
                         </a>
-                        <span style={{ color: "var(--text-dim)" }}>{pr.title}</span>
+                        <span style={{ color: pr.status === "closed" ? "var(--text-dim)" : "var(--text-dim)", opacity: pr.status === "closed" ? 0.5 : 1, textDecoration: pr.status === "closed" ? "line-through" : "none" }}>{pr.title}</span>
+                        {pr.status === "closed" && (
+                          <span style={{ fontSize: 11, color: "#888", marginLeft: 6, background: "#262626", padding: "1px 6px", borderRadius: 4 }}>closed</span>
+                        )}
                       </div>
                     ))}
                   </div>

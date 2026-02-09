@@ -1,18 +1,21 @@
 import { PR } from "./types";
 
-const GITHUB_API =
-  "https://api.github.com/repos/openclaw/openclaw/pulls?state=open&per_page=100";
+const BASE_URL = "https://api.github.com/repos/openclaw/openclaw/pulls";
 
-export async function fetchOpenPRs(): Promise<PR[]> {
+export async function fetchOpenPRs(since?: string): Promise<PR[]> {
   const allPRs: PR[] = [];
-  let url: string | null = GITHUB_API;
+  const sinceDate = since ? new Date(since) : null;
+
+  let url: string | null =
+    `${BASE_URL}?state=open&sort=created&direction=desc&per_page=100`;
 
   const headers: Record<string, string> = {
     Accept: "application/vnd.github+json",
   };
 
-  if (process.env.GITHUB_TOKEN) {
-    headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+  const token = process.env.PAT_TOKEN || process.env.GITHUB_TOKEN;
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
   }
 
   while (url) {
@@ -25,8 +28,15 @@ export async function fetchOpenPRs(): Promise<PR[]> {
     }
 
     const data = await res.json();
+    let hitOldPR = false;
 
     for (const pr of data) {
+      // Stop if this PR is older than our latest
+      if (sinceDate && new Date(pr.created_at) <= sinceDate) {
+        hitOldPR = true;
+        break;
+      }
+
       allPRs.push({
         number: pr.number,
         title: pr.title,
@@ -37,12 +47,44 @@ export async function fetchOpenPRs(): Promise<PR[]> {
       });
     }
 
+    if (hitOldPR) break;
+
     // Handle pagination via Link header
     const linkHeader = res.headers.get("link");
     url = parseLinkNext(linkHeader);
   }
 
   return allPRs;
+}
+
+export async function fetchOpenPRNumbers(): Promise<number[]> {
+  const numbers: number[] = [];
+  let url: string | null =
+    `${BASE_URL}?state=open&per_page=100`;
+
+  const headers: Record<string, string> = {
+    Accept: "application/vnd.github+json",
+  };
+
+  const token = process.env.PAT_TOKEN || process.env.GITHUB_TOKEN;
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  while (url) {
+    const res = await fetch(url, { headers });
+    if (!res.ok) throw new Error(`GitHub API error: ${res.status}`);
+
+    const data = await res.json();
+    for (const pr of data) {
+      numbers.push(pr.number);
+    }
+
+    const linkHeader = res.headers.get("link");
+    url = parseLinkNext(linkHeader);
+  }
+
+  return numbers;
 }
 
 function parseLinkNext(linkHeader: string | null): string | null {

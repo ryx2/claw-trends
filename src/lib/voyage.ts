@@ -14,7 +14,7 @@ export async function embed(texts: string[]): Promise<number[][]> {
     },
     body: JSON.stringify({
       input: texts,
-      model: "voyage-3-lite",
+      model: "voyage-4",
     }),
   });
 
