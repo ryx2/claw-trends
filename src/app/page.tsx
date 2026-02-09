@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 interface PR {
   number: number;
@@ -17,38 +17,44 @@ interface Cluster {
   prs: PR[];
 }
 
+const RANGES = [
+  { key: "day", label: "Today" },
+  { key: "3days", label: "3 Days" },
+  { key: "week", label: "Week" },
+  { key: "month", label: "Month" },
+  { key: "all", label: "All Time" },
+] as const;
+
+type RangeKey = (typeof RANGES)[number]["key"];
+
 export default function Home() {
   const [clusters, setClusters] = useState<Cluster[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [range, setRange] = useState<RangeKey>("all");
+
+  const fetchClusters = useCallback(async (r: RangeKey) => {
+    try {
+      const params = r === "all" ? "" : `?range=${r}`;
+      const res = await fetch(`/api/clusters${params}`);
+      if (!res.ok) throw new Error("fetch failed");
+      const data = await res.json();
+      setClusters(data.clusters);
+      setError(false);
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    let active = true;
-
-    async function fetchClusters() {
-      try {
-        const res = await fetch("/api/clusters");
-        if (!res.ok) throw new Error("fetch failed");
-        const data = await res.json();
-        if (active) {
-          setClusters(data.clusters);
-          setError(false);
-        }
-      } catch {
-        if (active) setError(true);
-      } finally {
-        if (active) setLoading(false);
-      }
-    }
-
-    fetchClusters();
-    const interval = setInterval(fetchClusters, 30_000);
-    return () => {
-      active = false;
-      clearInterval(interval);
-    };
-  }, []);
+    setLoading(true);
+    fetchClusters(range);
+    const interval = setInterval(() => fetchClusters(range), 30_000);
+    return () => clearInterval(interval);
+  }, [range, fetchClusters]);
 
   function toggleExpand(id: string) {
     setExpanded((prev) => {
@@ -62,7 +68,7 @@ export default function Home() {
   return (
     <div style={{ maxWidth: 768, margin: "0 auto", padding: "48px 16px" }}>
       {/* Header */}
-      <header style={{ marginBottom: 40 }}>
+      <header style={{ marginBottom: 32 }}>
         <h1 style={{ fontSize: 30, fontWeight: 700, marginBottom: 4 }}>
           {"\uD83E\uDD9E"} Claw Trends
         </h1>
@@ -78,6 +84,30 @@ export default function Home() {
           github.com/openclaw/openclaw
         </a>
       </header>
+
+      {/* Range tabs */}
+      <div style={{ display: "flex", gap: 4, marginBottom: 24, flexWrap: "wrap" }}>
+        {RANGES.map((r) => (
+          <button
+            key={r.key}
+            onClick={() => setRange(r.key)}
+            style={{
+              padding: "6px 14px",
+              borderRadius: 6,
+              border: "1px solid",
+              borderColor: range === r.key ? "var(--claw-red)" : "var(--border)",
+              background: range === r.key ? "var(--claw-red-dim)" : "transparent",
+              color: range === r.key ? "var(--claw-red)" : "var(--text-dim)",
+              cursor: "pointer",
+              fontSize: 13,
+              fontWeight: range === r.key ? 600 : 400,
+              transition: "all 0.15s",
+            }}
+          >
+            {r.label}
+          </button>
+        ))}
+      </div>
 
       {/* Loading */}
       {loading && (
@@ -107,7 +137,7 @@ export default function Home() {
       {/* Empty */}
       {!loading && !error && clusters.length === 0 && (
         <p style={{ color: "var(--text-dim)", textAlign: "center", padding: 40 }}>
-          No PRs tracked yet. Data syncs every minute.
+          No PRs found for this time range.
         </p>
       )}
 

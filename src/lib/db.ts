@@ -56,26 +56,47 @@ export async function markClosedPRs(openPRNumbers: number[]) {
   );
 }
 
-export async function getClusters() {
-  const result = await sql`
-    SELECT
-      cluster_id,
-      COUNT(*)::int AS count,
-      json_agg(
-        json_build_object(
-          'number', pr_number,
-          'title', title,
-          'url', url,
-          'status', status,
-          'created_at', created_at
-        )
-        ORDER BY created_at DESC
-      ) AS prs,
-      MAX(created_at) AS latest_pr
-    FROM prs
-    GROUP BY cluster_id
-    ORDER BY count DESC
-  `;
+export async function getClusters(since?: string) {
+  const query = since
+    ? sql`
+        SELECT
+          cluster_id,
+          COUNT(*)::int AS count,
+          json_agg(
+            json_build_object(
+              'number', pr_number,
+              'title', title,
+              'url', url,
+              'status', status,
+              'created_at', created_at
+            )
+            ORDER BY created_at DESC
+          ) AS prs
+        FROM prs
+        WHERE created_at >= ${since}::timestamp
+        GROUP BY cluster_id
+        ORDER BY count DESC
+      `
+    : sql`
+        SELECT
+          cluster_id,
+          COUNT(*)::int AS count,
+          json_agg(
+            json_build_object(
+              'number', pr_number,
+              'title', title,
+              'url', url,
+              'status', status,
+              'created_at', created_at
+            )
+            ORDER BY created_at DESC
+          ) AS prs
+        FROM prs
+        GROUP BY cluster_id
+        ORDER BY count DESC
+      `;
+
+  const result = await query;
 
   return result.rows.map((row) => ({
     id: row.cluster_id,

@@ -1,9 +1,25 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getClusters } from "@/lib/db";
 
-export async function GET() {
+const RANGES: Record<string, number> = {
+  day: 1,
+  "3days": 3,
+  week: 7,
+  month: 30,
+};
+
+export async function GET(request: NextRequest) {
   try {
-    const clusters = await getClusters();
+    const range = request.nextUrl.searchParams.get("range");
+
+    let since: string | undefined;
+    if (range && range in RANGES) {
+      const d = new Date();
+      d.setDate(d.getDate() - RANGES[range]);
+      since = d.toISOString();
+    }
+
+    const clusters = await getClusters(since);
 
     return NextResponse.json(
       { clusters },
