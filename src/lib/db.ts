@@ -149,7 +149,7 @@ export async function getClusters(since?: string) {
             ORDER BY created_at DESC
           ) AS prs
         FROM prs
-        WHERE created_at >= ${since}::timestamp
+        WHERE status = 'open' AND created_at >= ${since}::timestamp
         GROUP BY cluster_id
         ORDER BY count DESC
       `
@@ -169,6 +169,7 @@ export async function getClusters(since?: string) {
             ORDER BY created_at DESC
           ) AS prs
         FROM prs
+        WHERE status = 'open'
         GROUP BY cluster_id
         ORDER BY count DESC
       `;
@@ -201,7 +202,7 @@ export async function getIssueClusters(since?: string) {
             ORDER BY created_at DESC
           ) AS items
         FROM issues
-        WHERE created_at >= ${since}::timestamp
+        WHERE status = 'open' AND created_at >= ${since}::timestamp
         GROUP BY cluster_id
         ORDER BY count DESC
       `
@@ -221,6 +222,7 @@ export async function getIssueClusters(since?: string) {
             ORDER BY created_at DESC
           ) AS items
         FROM issues
+        WHERE status = 'open'
         GROUP BY cluster_id
         ORDER BY count DESC
       `;
