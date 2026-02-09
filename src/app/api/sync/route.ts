@@ -93,14 +93,16 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // --- Closure detection ---
+    // --- Closure detection (only on full hourly check) ---
+    // Quick checks with partial data (e.g. 200 items) would incorrectly
+    // mark everything else as closed, so we only run closure detection
+    // during the full check.
     const lastFullCheck = await getSyncMeta("last_full_closure_check");
     const now = Date.now();
     const needsFullCheck =
       !lastFullCheck || now - new Date(lastFullCheck).getTime() > FULL_CHECK_INTERVAL_MS;
 
     if (needsFullCheck) {
-      // Full check: fetch all open items (no limit)
       const openPRs = await fetchRecentClosedCheck("pr", Infinity);
       await markClosedPRs(openPRs);
 
@@ -108,13 +110,6 @@ export async function GET(request: NextRequest) {
       await markClosedIssues(openIssues);
 
       await setSyncMeta("last_full_closure_check", new Date(now).toISOString());
-    } else {
-      // Quick check: only most recent 200 items per type
-      const recentOpenPRs = await fetchRecentClosedCheck("pr", 200);
-      await markClosedPRs(recentOpenPRs);
-
-      const recentOpenIssues = await fetchRecentClosedCheck("issue", 200);
-      await markClosedIssues(recentOpenIssues);
     }
 
     return NextResponse.json({
