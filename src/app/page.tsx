@@ -7,6 +7,7 @@ interface PR {
   title: string;
   url: string;
   status: string;
+  created_at: string;
 }
 
 interface Cluster {
@@ -196,7 +197,7 @@ export default function Home() {
                     }}
                   >
                     {cluster.prs.map((pr) => (
-                      <div key={pr.number} style={{ fontSize: 14, lineHeight: 1.5 }}>
+                      <div key={pr.number} style={{ fontSize: 14, lineHeight: 1.5, display: "flex", alignItems: "baseline", gap: 6 }}>
                         <a
                           href={pr.url}
                           target="_blank"
@@ -205,14 +206,17 @@ export default function Home() {
                             color: "var(--claw-red)",
                             textDecoration: "none",
                             fontWeight: 600,
-                            marginRight: 6,
+                            flexShrink: 0,
                           }}
                         >
                           #{pr.number}
                         </a>
-                        <span style={{ color: pr.status === "closed" ? "var(--text-dim)" : "var(--text-dim)", opacity: pr.status === "closed" ? 0.5 : 1, textDecoration: pr.status === "closed" ? "line-through" : "none" }}>{pr.title}</span>
+                        <span style={{ opacity: pr.status === "closed" ? 0.5 : 1, textDecoration: pr.status === "closed" ? "line-through" : "none", color: "var(--text-dim)" }}>{pr.title}</span>
+                        <span style={{ fontSize: 11, color: "#666", flexShrink: 0, marginLeft: "auto" }}>
+                          {new Date(pr.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                        </span>
                         {pr.status === "closed" && (
-                          <span style={{ fontSize: 11, color: "#888", marginLeft: 6, background: "#262626", padding: "1px 6px", borderRadius: 4 }}>closed</span>
+                          <span style={{ fontSize: 11, color: "#888", background: "#262626", padding: "1px 6px", borderRadius: 4, flexShrink: 0 }}>closed</span>
                         )}
                       </div>
                     ))}

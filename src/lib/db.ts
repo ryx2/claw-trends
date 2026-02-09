@@ -66,13 +66,15 @@ export async function getClusters() {
           'number', pr_number,
           'title', title,
           'url', url,
-          'status', status
+          'status', status,
+          'created_at', created_at
         )
-        ORDER BY created_at
-      ) AS prs
+        ORDER BY created_at DESC
+      ) AS prs,
+      MAX(created_at) AS latest_pr
     FROM prs
     GROUP BY cluster_id
-    ORDER BY count DESC
+    ORDER BY latest_pr DESC
   `;
 
   return result.rows.map((row) => ({
