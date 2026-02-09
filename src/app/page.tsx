@@ -144,8 +144,13 @@ export default function Home() {
       {/* Cluster list */}
       {!loading && !error && clusters.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {clusters.map((cluster) => {
+          {clusters.map((cluster, idx) => {
             const isOpen = expanded.has(cluster.id);
+            const t = clusters.length > 1 ? idx / (clusters.length - 1) : 0;
+            const r = Math.round(229 * (1 - t));
+            const g = Math.round(77 * (1 - t));
+            const b = Math.round(46 * (1 - t));
+            const badgeColor = `rgb(${r}, ${g}, ${b})`;
             return (
               <div
                 key={cluster.id}
@@ -184,7 +189,7 @@ export default function Home() {
                       minWidth: 32,
                       height: 32,
                       borderRadius: "50%",
-                      background: "var(--claw-red)",
+                      background: badgeColor,
                       color: "#fff",
                       display: "flex",
                       alignItems: "center",
