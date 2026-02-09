@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 
 interface PR {
   number: number;
@@ -28,12 +29,25 @@ const RANGES = [
 
 type RangeKey = (typeof RANGES)[number]["key"];
 
+const VALID_RANGES = new Set<string>(RANGES.map((r) => r.key));
+
 export default function Home() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [clusters, setClusters] = useState<Cluster[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [range, setRange] = useState<RangeKey>("all");
+
+  const range = useMemo<RangeKey>(() => {
+    const param = searchParams.get("range");
+    return param && VALID_RANGES.has(param) ? (param as RangeKey) : "all";
+  }, [searchParams]);
+
+  function setRange(r: RangeKey) {
+    const params = r === "all" ? "/" : `?range=${r}`;
+    router.push(params, { scroll: false });
+  }
 
   const fetchClusters = useCallback(async (r: RangeKey) => {
     try {
