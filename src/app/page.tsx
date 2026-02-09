@@ -344,6 +344,9 @@ export default function Home() {
                   >
                     {cluster.prs.map((item) => (
                       <div key={item.number} style={{ fontSize: 14, lineHeight: 1.6 }}>
+                        <span style={{ fontSize: 11, color: "#666", marginRight: 6 }}>
+                          {new Date(item.created_at + "Z").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                        </span>
                         <a
                           href={item.url}
                           target="_blank"
@@ -358,9 +361,6 @@ export default function Home() {
                           #{item.number}
                         </a>
                         <span style={{ opacity: item.status === "closed" ? 0.5 : 1, textDecoration: item.status === "closed" ? "line-through" : "none", color: "var(--text-dim)" }}>{item.title}</span>
-                        <span style={{ fontSize: 11, color: "#666", marginLeft: 6 }}>
-                          {new Date(item.created_at + "Z").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                        </span>
                         {item.comments > 0 && (
                           <span style={{ fontSize: 11, color: "#666", marginLeft: 4 }}>
                             💬{item.comments}
