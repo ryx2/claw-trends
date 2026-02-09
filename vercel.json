@@ -4,5 +4,16 @@
       "path": "/api/sync",
       "schedule": "* * * * *"
     }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "all"
+        }
+      ]
+    }
   ]
 }
