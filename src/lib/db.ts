@@ -74,7 +74,7 @@ export async function getClusters() {
       MAX(created_at) AS latest_pr
     FROM prs
     GROUP BY cluster_id
-    ORDER BY latest_pr DESC
+    ORDER BY count DESC
   `;
 
   return result.rows.map((row) => ({
